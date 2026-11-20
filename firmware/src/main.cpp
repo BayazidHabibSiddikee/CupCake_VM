@@ -1,0 +1,180 @@
+#include <Arduino.h>
+#include <ArduinoJson.h>
+#include "face.h"
+#include "motor.h"
+#include "ble.h"
+#include "auth.h"
+#include "net.h"
+
+static constexpr const char* FW_NAME = "CupCake-Companion";
+static constexpr const char* FW_VERSION = "0.1.0";
+
+Face face;
+Motors motors;
+BleLink ble;
+Net net;
+DeviceAuth auth;
+
+// Battery sense: battery+ -> 2x 100k divider -> battery PIN.
+// Plain ESP32: GPIO2 is ADC2 (unusable while WiFi is on) — use ADC1-only
+// input pin GPIO34. ESP32-S3 keeps the documented GPIO2.
+// 3.0-4.2 V maps to 1.5-2.1 V, safe under the 3.3 V ADC reference.
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
+static constexpr int PIN_BATTERY = 2;
+#else
+static constexpr int PIN_BATTERY = 34;  // input-only, ADC1_CH6
+#endif
+static constexpr float ADC_SCALE = 2.0f;      // divider ratio
+static constexpr float BATTERY_FULL = 4.2f;
+static constexpr float BATTERY_EMPTY = 3.3f;
+static uint32_t lastBatterySend_ = 0;
+
+static float batteryVoltage() {
+    uint32_t acc = 0;
+    for (int i = 0; i < 8; i++) acc += analogReadMilliVolts(PIN_BATTERY);
+    float mv = (acc / 8.0f) * ADC_SCALE;
+    return mv / 1000.0f;
+}
+
+static float batteryPercent() {
+    float pct = (batteryVoltage() - BATTERY_EMPTY) / (BATTERY_FULL - BATTERY_EMPTY) * 100.0f;
+    return pct < 0 ? 0 : pct > 100 ? 100 : pct;
+}
+
+// ------------------------- WiFi scan cache -----------------------------------
+// Scanning is ASYNC (long ~3s + blocks the BLE task when run synchronously from
+// a GATT callback — the phone then sees the command time out). handleCommand
+// only kicks off / returns cached results; loop() collects the finished scan.
+
+static String scanCache = "[]";   // JSON string of [{ssid,rssi,secure},...]
+static uint32_t scanDoneMs = 0;
+static bool scanning = false;
+
+static void finishScanIfDone() {
+    if (!scanning) return;
+    int n = WiFi.scanComplete();
+    if (n >= 0) {
+        JsonDocument nets;
+        JsonArray arr = nets.to<JsonArray>();
+        for (int i = 0; i < n; i++) {
+            JsonObject neto = arr.add<JsonObject>();
+            neto["ssid"] = WiFi.SSID(i);
+            neto["rssi"] = WiFi.RSSI(i);
+            neto["secure"] = WiFi.encryptionType(i) != WIFI_AUTH_OPEN;
+        }
+        serializeJson(nets, scanCache);
+        scanDoneMs = millis();
+        WiFi.scanDelete();
+        scanning = false;
+    } else if (n == WIFI_SCAN_FAILED) {
+        scanning = false;   // failed start: allow the phone's next poll to retry
+    }
+}
+
+static void requestScan() {
+    if (scanning) return;
+    // WiFi.scanDelete() can zero out WiFi globals; guard against reusing the
+    // buffer while a previous result generation is still being served.
+    WiFi.scanNetworks(/*async=*/true);
+    scanning = true;
+}
+
+// ------------------------- BLE command handler -------------------------------
+// Mirrors the app-side WifiProvisioner / DeviceSetup commands.
+
+static void handleCommand(const String& type, const String& action,
+                          JsonObjectConst params, JsonObject data) {
+    if (type == "wifi") {
+        if (action == "scan") {
+            finishScanIfDone();
+            if (scanning) {
+                data["ok"] = false;
+                data["message"] = "scanning";
+                return;
+            }
+            if (scanCache.length() > 2 && millis() - scanDoneMs < 60000) {
+                String list = scanCache;    // WifiProvisioner expects a JSON *string*
+                data["networks"] = list;
+                return;
+            }
+            requestScan();
+            data["ok"] = false;
+            data["message"] = "scanning";   // phone polls until results are cached
+        } else if (action == "connect") {
+            net.wifiConnect(params["ssid"].as<const char*>(), params["password"].as<const char*>());
+            data["state"] = "connecting";
+            data["ssid"] = params["ssid"].as<const char*>();
+            data["ip"] = "";
+            data["rssi"] = 0;
+        } else if (action == "status") {
+            JsonDocument d;
+            JsonObject st = net.status(d);
+            data["state"] = st["state"].as<String>();
+            data["ssid"] = st["ssid"].as<String>();
+            data["ip"] = st["ip"].as<String>();
+            data["rssi"] = st["rssi"].as<int>();
+        } else if (action == "forget") {
+            net.wifiForget();
+        } else {
+            data["ok"] = false;
+            data["message"] = "unknown wifi action";
+        }
+    } else if (type == "info") {
+        data["name"] = FW_NAME;
+        data["fw"] = FW_VERSION;
+        data["ws"] = net.wsConnected();
+        data["batteryPct"] = batteryPercent();
+    } else {
+        data["ok"] = false;
+        data["message"] = "unsupported command type";
+    }
+}
+
+void setup() {
+    face.begin();
+    motors.begin();
+
+    net.onFace = [](const String& expression, uint32_t durationMs) {
+        face.set(expression, durationMs);
+    };
+    net.onMotor = [](const String& action) { motors.execute(action); };
+
+    ble.onFace = [](const String& expression) { face.set(expression); };
+    ble.onMotor = [](const String& action) { motors.execute(action); };
+    ble.onCommand = [](const String& type, const String& action,
+                       JsonObjectConst params, JsonObject data) {
+        handleCommand(type, action, params, data);
+    };
+
+    auth.begin();
+    ble.setAuth(&auth);
+    net.setAuth(&auth);
+
+    ble.begin(FW_NAME);
+    net.begin();
+}
+
+void loop() {
+    ble.tick();
+    net.tick();
+    face.tick();
+    motors.tick();
+    finishScanIfDone();
+
+    // Dev escape hatch: typing "auth-reset" on the USB serial clears pairing.
+    if (Serial.available()) {
+        static String line;
+        line = Serial.readStringUntil('\n');
+        line.trim();
+        if (line == "auth-reset") {
+            auth.factoryReset();
+            Serial.println("[auth] pairing cleared");
+        }
+    }
+
+    // Battery telemetry over the existing BLE battery frame every 5 s.
+    if (millis() - lastBatterySend_ > 5000) {
+        lastBatterySend_ = millis();
+        ble.notifyBattery(batteryVoltage(), batteryPercent());
+    }
+}
