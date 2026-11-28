@@ -37,7 +37,7 @@
 > **Workspace:** `competition/gga/` (charter, protocol notes, agent scaffold, submission notebook).
 > Full analysis in `docs/GGA_COMPETITION_REPORT.md`. Do phases in order; measure the reflex baseline before spending GPU time on a fine-tune.
 
-- [ ] **[GGA-00]** Join "Generalist Gaming Agent" on Kaggle, accept rules (entry deadline Feb 22 2027), attach dataset + `liltii-v0.3-q4_k_m.gguf` + `liltii-v0.3-mmproj.gguf`, verify headless local run of `off_line` with a stub agent.
+- [x] **[GGA-00]** Account already entered (`userHasEntered: True`); dataset downloaded to `competition/gga/data/`; headless 1-min `off_line` smoke test passed (299 steps, 0 action errors) with the `skip` scaffold. Still TODO: attach `liltii-v0.3-q4_k_m.gguf` + `liltii-v0.3-mmproj.gguf` to the Kaggle notebook (GGA-01).
 - [ ] **[GGA-01]** Notebook skeleton: background `llama-server` on localhost, `%%writefile /kaggle/working/agent.py` with `Agent.__init__` / `step(obs, tools) -> Action`, end cell `GGAInferenceServer().run()`; confirm submission accepted.
 - [ ] **[GGA-02]** Reflex baseline: parse `obs.info.description`/`controls`, deterministic heuristic policy over the 11 tools, `sequence`/`skip` orchestration, game-boundary reset via `obs.elapsed_s`; nonzero score on all 4 sample games.
 - [ ] **[GGA-03]** Vision integration: downscale `obs.image` → mmproj, replace emotion grammar with a tool-call grammar, hard latency budget (<90 s, aim ~1 s), SLM emits cached action programs.

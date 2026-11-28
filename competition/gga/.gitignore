@@ -1,3 +1,7 @@
+# Downloaded competition data and local venv (never commit)
+data/
+.venv/
+
 # Local test outputs and generated junk
 runs/
 trajectories/

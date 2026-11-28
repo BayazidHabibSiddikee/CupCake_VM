@@ -154,6 +154,28 @@
 
 **Pending:** GGA-00 (join/accept rules, attach dataset + v0.3 GGUFs, 1-min headless smoke test) when user gives go-ahead.
 
+---
+
+## 2026-11-28 (4) — GGA-00 completed: account entered, dataset attached locally, smoke test passed
+
+**Done:**
+- Checked Kaggle account state via CLI: `userHasEntered: True`, 0 submissions, 5 remaining today → **already joined**; CLI has no `join` command and rule acceptance must happen in the browser anyway.
+- Downloaded competition dataset (354 MB) to `competition/gga/data/` (gitignored).
+- Read the real `gga/protocol.py` (API_VERSION 1.3) and corrected the scaffold: `obs.info` is a **dict** (not an object), game boundary is `obs.elapsed_s` (plus `last_action == {}` edge case), `ToolSpec` uses `.name`, `Action` has `.meta`, `validate()`/`check_action()` available.
+- Rewrote `competition/gga/agent.py` accordingly; expanded `PROTOCOL_NOTES.md` with verified harness facts.
+- Set up local test env: `competition/gga/.venv` (system Python externally managed), installed playwright 1.60.0; bundled browser binaries needed `chmod +x` after unzip; `PLAYWRIGHT_BROWSERS_PATH=.../kit/browsers`.
+- **1-minute headless smoke test passed:** `{"game":"off_line","steps":299,"status":"ok","action_errors":[],"frames_seen":1196,"score":null}`.
+- Updated README (verified setup section + status), BACKLOG (GGA-00 done), workspace `.gitignore` (`.venv/`).
+
+**Decided:**
+- Scaffold stays a safe no-op; it validates submission mechanics only. No model server yet — that is GGA-01/03.
+- Models can be swapped between submissions: attach different GGUFs to a new notebook version, resubmit; only the two selected final submissions matter. Must remain entered before Feb 22 2027.
+- Local runs report `score: null`; all scoring comes from Kaggle reruns (~6 h).
+
+**Bugs found:** Bundled Chromium/`chrome-headless-shell` lose executable bit on unzip → `EACCES` until `chmod +x` (documented in README). System pip blocked by PEP 668 → use the project venv.
+
+**Pending:** GGA-01 (notebook: attach v0.3 GGUFs, start llama-server, write agent.py, run GGAInferenceServer), then GGA-02 reflex baseline.
+
 
 
 

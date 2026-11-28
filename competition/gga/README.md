@@ -2,7 +2,7 @@
 
 **Mission:** build the offline agent for Kaggle's [Generalist Gaming Agent](https://www.kaggle.com/competitions/generalist-gaming-agent) competition and submit it before **Mar 1, 2027** (entry/rules deadline **Feb 22, 2027**).
 
-**Status (2026-11-28):** Phase 0 — workspace ready, competition dataset **not yet attached**, no agent run yet.
+**Status (2026-11-28):** GGA-00 ✅ — account already entered, dataset downloaded (354 MB) into `data/`, and the 1-minute headless smoke test passed (299 steps, 0 action errors). GGA-01 onward not started.
 **Full analysis:** [`../../docs/GGA_COMPETITION_REPORT.md`](../../docs/GGA_COMPETITION_REPORT.md) (facts, asset audit, gaps, architecture, risks, Gemma4 comparison).
 **Backlog:** [`../../BACKLOG.md`](../../BACKLOG.md) → section **GGA COMPETITION** (GGA-00 … GGA-06).
 
@@ -29,7 +29,7 @@
 
 ## Phase checklist
 
-- [ ] **GGA-00** Join + accept rules, attach competition dataset and weights, run `gga.game` headless for 1 min with the stub agent.
+- [x] **GGA-00** Account already entered (`userHasEntered: True`), dataset downloaded, 1-min headless smoke test passed with the `skip` scaffold. Weights still need attaching to the Kaggle notebook.
 - [ ] **GGA-01** Notebook skeleton boots `llama-server` (mmproj), writes `agent.py`, ends with `GGAInferenceServer().run()`; submission accepted.
 - [ ] **GGA-02** Reflex baseline: brief parser + deterministic heuristics over the 11 tools; `sequence`/`skip` orchestration; game reset on `elapsed_s ≈ 0`.
 - [ ] **GGA-03** Vision: downscale `obs.image` → mmproj, tool-call grammar, latency budget; SLM emits cached action programs.
@@ -37,16 +37,31 @@
 - [ ] **GGA-05** Generalization hardening: hidden-genre robustness, refusal recovery, stable seeds, full 32-game run.
 - [ ] **GGA-06** Select two final submissions before Mar 1 2027.
 
-## First commands (once the dataset is attached)
+## Verified local setup (GGA-00)
+
+From the repo root:
 
 ```bash
-# From the competition dataset root (Python 3.11+)
-pip install playwright==1.60.0 pillow
-playwright install chromium
+# Dataset (354 MB) — already done once; skip if data/ exists
+kaggle competitions download -c generalist-gaming-agent -p competition/gga/data --unzip
 
-# Fast smoke test — no score reported locally
-GGA_HEADLESS=1 python -m gga.game --game off_line \
-  --agent /path/to/CupCake_VM/competition/gga/agent.py --minutes 1
+# Isolated env (system Python is externally managed)
+python3 -m venv --system-site-packages competition/gga/.venv
+competition/gga/.venv/bin/pip install playwright==1.60.0
+
+# Unzip drops the executable bit on the bundled browsers — restore it
+find competition/gga/data/kit/browsers -type f \
+  \( -name 'chrome' -o -name 'chrome-headless-shell' -o -name 'ffmpeg-linux' \) \
+  -exec chmod +x {} +
 ```
+
+Then, from `competition/gga/data`:
+
+```bash
+PLAYWRIGHT_BROWSERS_PATH=$PWD/kit/browsers GGA_HEADLESS=1 \
+  ../.venv/bin/python -m gga.game --game off_line --agent ../agent.py --minutes 1
+```
+
+Result on 2026-11-28: `{"status": "ok", "steps": 299, "frames_seen": 1196, "action_error_count": 0, "score": null}` — local runs never report a score.
 
 **Model choice:** `liltii-v0.3-q4_k_m.gguf` + `liltii-v0.3-mmproj.gguf` is the primary slow brain (~718 MB, ~48 tok/s reported). `Lilti_gemma4_E2B_pruned_v0.1` (~3.5 GB, ~21.8 tok/s, native `<|tool_call>` template, non-OSI license) is a documented A/B challenger, not the default — see report §10.

@@ -1,14 +1,15 @@
-"""GGA agent SCAFFOLD — submission-mechanics baseline only.
+"""GGA agent SCAFFOLD — submission-mechanics baseline only (GGA-01).
 
-Status: GGA-01. This agent returns `skip` every step. It is intentionally a no-op:
-its job is to prove the notebook, the local server and the submission path work,
-not to score points. Expected score ≈ 0.
+Verified against the downloaded competition harness: API_VERSION 1.3,
+`gga/protocol.py`. This agent returns `skip` every step. It intentionally scores
+~0: its job is to prove the notebook, local server and submission path work.
 
-Do NOT treat this as the competition agent. See README.md / BACKLOG.md phases
-GGA-02..GGA-05 for the reflex policy, vision path and fine-tune.
+Do NOT treat this as the competition agent. See README.md / BACKLOG.md for
+GGA-02 (reflex policy), GGA-03 (vision + tool grammar), GGA-04 (fine-tune).
 
-`gga.protocol` only exists after the competition dataset is attached. Local
-smoke test: GGA_HEADLESS=1 python -m gga.game --game off_line --agent <this file> --minutes 1
+Local smoke test (from competition/gga/data, Python 3.11+):
+  GGA_HEADLESS=1 python -m gga.game --game off_line \
+      --agent ../agent.py --minutes 1
 """
 
 from __future__ import annotations
@@ -16,11 +17,11 @@ from __future__ import annotations
 from typing import Any
 
 try:
-    from gga.protocol import Action, Observation, ToolSpec
+    from gga.protocol import Action, Observation, ToolSpec, validate
 except ImportError as exc:  # pragma: no cover - dataset not attached yet
     raise SystemExit(
-        "gga.protocol not found. Attach the competition dataset first "
-        "(see competition/gga/README.md)."
+        "gga.protocol not found. Attach the competition dataset and run from "
+        "competition/gga/data (see competition/gga/README.md)."
     ) from exc
 
 
@@ -39,57 +40,69 @@ class Agent:
     def __init__(self) -> None:
         # TODO GGA-01: connect to the localhost llama-server (v0.3 + mmproj).
         # TODO GGA-03: load the tool-call grammar / constrained decoder.
-        self._game_key: Any = None
-        self._brief: dict[str, Any] = {}
+        self._last_elapsed_s = 0.0
         self._steps_in_game = 0
+        self._brief: dict[str, Any] = {}
 
     def _reset_game_if_needed(self, obs: Observation) -> None:
-        """Detect a new game: elapsed_s drops back near 0."""
-        remaining = getattr(getattr(obs, "info", None), "remaining_s", None)
-        key = round(float(remaining or 0.0), 0)
-        if key != self._game_key:
-            self._game_key = key
+        """Protocol: a new game starts when elapsed_s restarts near 0, or when
+        the same elapsed_s arrives with last_action {} (game ended at its first
+        observation)."""
+        elapsed = float(obs.elapsed_s)
+        new_game = (
+            self._steps_in_game >= 1
+            and (
+                elapsed < self._last_elapsed_s - 0.25
+                or elapsed <= 0.25
+                or obs.last_action == {}
+            )
+        )
+        if new_game:
             self._brief = {}
             self._steps_in_game = 0
-        # NOTE: replace with obs.elapsed_s once the real field is confirmed in
-        # gga.protocol.py. remaining_s is a placeholder for the same boundary.
+        self._last_elapsed_s = elapsed
+        self._steps_in_game += 1
 
     def _parse_brief(self, obs: Observation) -> dict[str, Any]:
-        """TODO GGA-02: turn obs.info.description/controls into an action vocabulary.
-
-        This is the main generalisation lever for the 28 hidden games.
-        """
-        info = getattr(obs, "info", None)
-        if info is None:
-            return {}
+        """TODO GGA-02: turn obs.info['description'] / ['controls'] into an
+        action vocabulary. This is the main generalisation lever for the 28
+        hidden games. obs.info is a plain dict, not an object."""
+        info: dict[str, Any] = obs.info or {}
         return {
-            "description": getattr(info, "description", ""),
-            "controls": getattr(info, "controls", ""),
-            "width": getattr(info, "width", None),
-            "height": getattr(info, "height", None),
+            "description": info.get("description", ""),
+            "controls": info.get("controls", ""),
+            "width": info.get("width"),
+            "height": info.get("height"),
+            "game_id": info.get("game_id"),
+            "title": info.get("title"),
+            "genre": info.get("genre"),
         }
 
     def step(self, obs: Observation, tools: list[ToolSpec]) -> Action:
         """Return exactly one valid tool call. Always safe: fallback is `skip`."""
         self._reset_game_if_needed(obs)
         self._brief = self._parse_brief(obs)
-        self._steps_in_game += 1
 
-        # Validate against the tools actually offered by the harness.
-        offered = {
-            getattr(tool, "tool", None) or getattr(tool, "name", None)
-            for tool in tools
-        } - {None}
-        allowed = offered & VALID_TOOLS or VALID_TOOLS
+        # ToolSpec has .name / .description / .parameters (JSON schema).
+        offered = {tool.name for tool in tools} & VALID_TOOLS
+        if not offered:
+            return Action("skip", {})
 
         # TODO GGA-02: deterministic reflex policy (heuristics / behavior tree).
-        # TODO GGA-03: when the SLM is ready, publish cached plans via `sequence`
-        #              and yield with `skip` while it thinks.
-        # TODO GGA-05: handle obs.last_action refusals; enforce a hard latency budget.
-        if "skip" in allowed:
-            return Action(tool="skip", params={})
+        # TODO GGA-03: publish cached plans via `sequence`, yield with `skip`
+        #              while the multimodal model thinks.
+        # TODO GGA-05: handle obs.last_action refusals/dropped programs; enforce
+        #              a hard per-decision latency budget (< 90 s, aim < 1 s).
+        if "skip" in offered:
+            return Action("skip", {})
 
-        # `skip` should always be available; if not, `wait` is the safest no-op.
-        fallback = "wait" if "wait" in allowed else next(iter(allowed))
-        params = {"duration_ms": 200} if fallback == "wait" else {}
-        return Action(tool=fallback, params=params)
+        # `skip` should always be offered; `wait` is the safest remaining no-op.
+        tool = "wait" if "wait" in offered else next(iter(offered))
+        params: dict[str, Any] = {"duration_ms": 200} if tool == "wait" else {}
+        try:
+            width = int(self._brief["width"] or 0)
+            height = int(self._brief["height"] or 0)
+            params = validate(tool, params, width, height)
+        except Exception:
+            return Action("skip", {})
+        return Action(tool, params)
