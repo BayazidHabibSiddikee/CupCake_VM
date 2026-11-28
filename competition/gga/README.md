@@ -8,6 +8,10 @@
 
 ---
 
+## Mental model — what we are actually building
+
+An **external bot/agent**, not a game mod. It runs outside the game in its own container, sees only screenshots + a short text brief, and sends mouse/keyboard events through the harness (Playwright) at the browser-input layer — exactly like a human playing. It has **no access to game code, memory, internal state, DOM state or APIs**, and cannot modify the game. In-game outcomes ("kills", points, levels) come only from those input events. The game keeps running at 20 fps while the agent decides, and one agent must handle all 32 games, including 28 it has never seen. This is an offline benchmark in sandboxed Chromium — not an online cheat tool.
+
 ## Rules of engagement
 
 1. **All competition code lives here** (`competition/gga/`). Do not edit the Android app, ESP32 firmware, or `app/src/main/cpp/third_party/llama.cpp/` for this mission.
