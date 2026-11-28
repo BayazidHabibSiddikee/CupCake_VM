@@ -23,6 +23,7 @@
 | --- | --- |
 | `README.md` | This charter and phase checklist |
 | `PROTOCOL_NOTES.md` | Observation/action/timing/scoring facts transcribed from the Kaggle Data tab |
+| `RULES_AND_LIMITS.md` | Model-size ceilings, platform limits, and the full competition rules (technical + legal) |
 | `agent.py` | `Agent` scaffold — TODOs marked; not runnable until the dataset is attached |
 | `submission_template.ipynb` | Kaggle notebook skeleton: attach weights → start llama-server → write agent.py → start server |
 | `runs/` | Local test logs/outputs (gitignored) |

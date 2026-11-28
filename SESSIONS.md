@@ -176,6 +176,24 @@
 
 **Pending:** GGA-01 (notebook: attach v0.3 GGUFs, start llama-server, write agent.py, run GGAInferenceServer), then GGA-02 reflex baseline.
 
+---
+
+## 2026-11-28 (5) — Model-size limits + full rules compiled (no implementation)
+
+**Done:**
+- Answered the user's two questions by research only: maximum model size and all rules/regulations.
+- Added `competition/gga/RULES_AND_LIMITS.md`: platform ceilings (200 GB/dataset, 20 GB output, 30 GB CPU RAM, RTX Pro 6000 96 GB, 15-min startup, 9-h runtime, 90 s/decision, 5 submissions/day), practical size guidance (0.5–3B Q4 recommended; ≤10 GB attached total), and all competition rules — task/submission, scoring, timeline/prizes, and all 18 legal sections (C.1–C.18) — plus red lines and open items.
+- Added a pointer to it in `competition/gga/README.md`.
+
+**Decided:**
+- No competition-specific numeric model cap exists; latency (200 ms grid, 90 s deadline) is the binding constraint, not storage.
+- Keep v0.3 (~718 MB) as default; Gemma4-pruned (~3.5 GB) is an attach-safe challenger; 13B+ is not worth it for real-time control.
+- No competition-specific legal sections A/B were visible on the Rules tab; exact OSI license and max team size are not stated on the pages checked — recheck before final submission.
+
+**Bugs found:** None (documentation only).
+
+**Pending:** GGA-01 and GGA-02 unchanged; user asked not to jump ahead.
+
 
 
 
