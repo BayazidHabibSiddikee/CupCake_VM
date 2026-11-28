@@ -247,3 +247,67 @@ Key design decisions:
 - Rules: https://www.kaggle.com/competitions/generalist-gaming-agent/rules
 - Local blueprint: `PUBG_Ally/README.md`, `PUBG_Ally/pubg_ally_agent.py`
 - Local model card context: `SESSIONS.md` (2026-11-24), HF `bayazidhs04/Lilti_kiraa-v0.3-Qwen3.5-0.8B`
+
+---
+
+## 10. Addendum — `bayazidhs04/Lilti_gemma4_E2B_pruned_v0.1` checked against the competition
+
+Checked 2026-11-28 against the HF model card, HF API metadata, its `benchmark_results.json`, and the local pruning script (`training/gemma4_pruning/prune_gemma4_e2b.py`).
+
+### 10.1 What this model actually is
+
+| Property | Value |
+| --- | --- |
+| Architecture | `Gemma4ForConditionalGeneration` (`model_type: gemma4`), multimodal (image + audio) |
+| Base | `google/gemma-4-E2B-it` (5.1B params) → pruned to **~3.2B params** |
+| Vocab pruning | 262,144 → **160,704** tokens (ASCII/Latin + Bengali + Hindi + byte tokens + control tokens retained; BPE merge closure applied; all `*_token_id(s)` config fields remapped) |
+| Files | `gemma-4-E2B-pruned-en-bn.Q4_K_M.gguf` (~2.43–2.55 GB) + `gemma-4-E2B-pruned-en-bn.F16-mmproj.gguf` (~940 MB), `config.json`, `benchmark_results.json` |
+| Total to attach | **~3.5 GB** — well inside Kaggle's 200 GB/dataset limit |
+| Speed (self-reported, ARM) | ~21.8 tok/s (+50% over the 14.5 tok/s base); v0.3 Qwen3.5-0.8B reported at ~48 tok/s |
+| Output contract baked in | `[emo: tag] *action* reply` with 8 emotion tags + 4 `[mode: …]` tags |
+| License | **`gemma`** (custom, not OSI-approved) |
+| Chat template | Gemma 4 canonical template with **native tool-calling tokens** (`<|tool_call>`, function declarations, `enable_thinking=false` default) |
+
+### 10.2 Important: the model card's headline metric is not supported by its own data
+
+- Model card claims **Visual Grounding Accuracy 94.2%** and **Hallucination-Free Rate 97.8%**.
+- The repo's `benchmark_results.json` reports **`visual_grounding_accuracy: "50.0%"`** — 2 of 4 tests passed:
+  - ✅ Low HP 15% and 4-kill squad wipe — grounded.
+  - ❌ "Booyah #1" → replied "Squad wiped with 8 kills!" (not on screen).
+  - ❌ "Better Luck Next Time (#72)" → replied "Low HP alert! 0% baki ache…" (wrong context).
+- The JSON also marks the first failure `no_hallucination: true` while `visually_grounded: false`, so the two self-reported rates are internally inconsistent.
+- **Treat the 94.2% figure as unreliable.** The tests are 4 synthetic HUD-commentary prompts, not the competition's 32 games across 10 genres, and not action/spatial grounding.
+
+### 10.3 Competition fit
+
+| Requirement | This model |
+| --- | --- |
+| Publicly available pretrained weights, attachable | ✅ Yes; ~3.5 GB fine |
+| Served by llama.cpp / vLLM locally, offline | ✅ `gemma4` GGUF + mmproj, llama.cpp supports Gemma 4 |
+| Reads raw screen frames | ✅ Multimodal projector preserved and aligned (per card) |
+| Emits one of 11 tools + JSON params | ❌ Baked-in emotion-tag reply format; needs a new tool-call grammar and/or re-fine-tune |
+| Fast enough for 200 ms cadence / 90 s limit | ⚠️ Likely on the 96 GB GPU, but ~4× larger and ~2× slower per token than v0.3; must measure image-encode + decode latency |
+| Generalizes to 28 unseen games | ❌ Unproven; existing evaluation is synthetic PUBG/FreeFire HUD commentary only |
+| License | ⚠️ `gemma` is not OSI; rules exempt pretrained models with incompatible licenses from the code-license clause, but the exemption must be documented in the submission |
+
+### 10.4 Head-to-head with `Lilti_kiraa-v0.3-Qwen3.5-0.8B`
+
+| Dimension | Gemma4 E2B pruned v0.1 | Liltii v0.3 (Qwen3.5-0.8B) | Winner for GGA |
+| --- | --- | --- | --- |
+| Attach size | ~3.5 GB (GGUF + mmproj) | ~718 MB | **v0.3** |
+| Decode speed (ARM, reported) | ~21.8 tok/s | ~48 tok/s | **v0.3** |
+| Native structured tool calls in chat template | ✅ Yes | ⚠️ GBNF/schema needed | **Gemma4** |
+| Capacity for unfamiliar-game reasoning | ~3.2B params | 0.8B params | **Gemma4** (theoretical) |
+| Evidence of visual grounding | Self-reported 50% on 4 synthetic HUDs | ScreenSpot Pro 46.5 (earlier benchmark) | Tie / both unproven |
+| Action-control training data | None | None | Tie |
+| License friction | `gemma` custom | Qwen license (verify before final) | Depends on check |
+| Role | Secondary A/B challenger | Primary slow brain | — |
+
+### 10.5 Verdict and recommendation
+
+- **Allowed:** yes. **Drop-in usable:** no — same fundamental mismatch as v0.3 (chat/commentary output, no action training), with extra size, latency and license costs.
+- **Keep v0.3 as the primary slow brain** for GGA-03. Its 4.7× smaller footprint and ~2× speed suit a 200 ms loop far better.
+- **Keep Gemma4-pruned as an A/B challenger only**, and only *after* GGA-02 produces a working reflex baseline. Its one real advantage is the native Gemma 4 tool-call template: if v0.3's constrained decoding proves brittle, this model can emit `<|tool_call>` actions with less grammar engineering.
+- **Before any fine-tune on either model**, run the same three checks on the 4 sample games: (1) valid-action rate against `tools`, (2) end-to-end decision latency including image encode, (3) groundedness on real frames, not synthetic HUDs.
+- **Separate housekeeping:** correct or qualify the 94.2%/97.8% claims on the HF model card so future decisions aren't based on them. This is not a competition task.
+- **No backlog item was added for this model yet** — it stays a documented alternative until the GGA-02 baseline exists.

@@ -112,6 +112,26 @@
 
 **Pending:** GGA-00 (join/accept rules, attach weights, verify local headless run) when the user gives the go-ahead.
 
+---
+
+## 2026-11-28 (2) — Gemma4-E2B-pruned v0.1 checked against GGA competition
+
+**Done:**
+- Audited HF `bayazidhs04/Lilti_gemma4_E2B_pruned_v0.1` (card + HF API + `benchmark_results.json` + local `training/gemma4_pruning/prune_gemma4_e2b.py`) against the Kaggle competition.
+- Appended Section 10 to `docs/GGA_COMPETITION_REPORT.md`: model spec, benchmark discrepancy, competition-fit matrix, head-to-head vs Liltii v0.3, verdict.
+- Confirmed Kaggle dataset limit is 200 GB/dataset → ~3.5 GB of GGUF weights is not a blocker.
+
+**Decided:**
+- **Allowed but not ready** — same output-contract mismatch as v0.3, plus ~4.7× size, ~2× slower decode, and a non-OSI `gemma` license that needs documented exemption in the submission.
+- **v0.3 remains primary slow brain**; Gemma4-pruned is an A/B challenger only after GGA-02, mainly because its Gemma 4 chat template has native `<|tool_call>` tool calling.
+- Measure three things before fine-tuning anything: valid-action rate, image-encode + decode latency, groundedness on real sample-game frames.
+- **Benchmark discrepancy found:** model card claims 94.2% visual grounding / 97.8% hallucination-free, but its own `benchmark_results.json` says **50.0%** (2/4 synthetic HUD tests). Treat the card figure as unreliable; fix the card later (not a competition task).
+- No new GGA backlog item for this model; documented as an alternative only.
+
+**Bugs found:** Model-card/JSON metric conflict (94.2% vs 50.0%); one failed case flagged `no_hallucination: true` while `visually_grounded: false` — inconsistent self-evaluation.
+
+**Pending:** GGA-00 when user gives go-ahead; the A/B challenger test after GGA-02; HF card metric correction.
+
 
 
 
