@@ -16,6 +16,15 @@ Source: Kaggle Data tab + `competition/gga/data/gga/protocol.py` (**API_VERSION 
 | `frame` | Episode frame this observation shows. |
 | `history` | Up to 8 evenly-spread earlier frames since your previous observation, same size as `image`. **Do not keep whole observations — frames are large.** |
 
+## Input modalities — what actually reaches the agent
+
+- **Image: yes, the primary signal.** `image`, `frames`, `history` are all JPEGs. Multiple frames can be fed to a vision encoder, but there is no video stream object — just frame lists.
+- **Text: yes, but only structured text.** `info['description']`, `info['controls']`, metadata (fps/grid_frames/remaining_s/width/height), `last_action` and the 11 `ToolSpec` descriptions/schemas. There is **no dialogue or conversation** with the game.
+- **Audio: NO.** There is no `audio`/sound field in `Observation`, and no audio path in `kaggle_evaluation`. Games contain `.ogg` assets and Chromium decodes audio for its own lockstep, but **none of it is given to the agent**. An audio-capable model gets zero extra signal.
+- **Structured state: yes.** `held`, `program`, `program_left_s`, `frame`, `elapsed_s` are crucial for control — easy to overlook if you only feed pixels to the model.
+
+**Implication:** a text+image model is the right shape; audio support is dead weight here. The hard part is action grounding (pixels + brief → tool call), not understanding speech.
+
 ## Action — `Action(tool, params, meta)`
 
 `meta` is agent-only notes (logged, never sent). `params`/`meta` must be JSON values. Use `gga.protocol.validate(tool, params, width, height)` to check a reply exactly as the harness does; `check_action` checks the schema only. `valid_key()` and `normalize_key()` handle key aliases (`space`, `up`, `esc`, `KeyW`, `Digit1`, …).
