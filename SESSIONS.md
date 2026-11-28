@@ -194,6 +194,28 @@
 
 **Pending:** GGA-01 and GGA-02 unchanged; user asked not to jump ahead.
 
+---
+
+## 2026-11-29 — Competition mission moved to `gamer_boy_himu` repo; data-first decision
+
+**Done:**
+- Created standalone directory `/home/bayazid/Documents/android/gamer_boy_himu/` and GitHub repo `BayazidHabibSiddikee/gamer_boy_himu`; copied competition docs/protocol/rules and the agent scaffold. Models in `CupCake_VM` were **not** moved or modified.
+- Built and pushed a parallel trajectory harvester (`harvest/`): `random` + `heuristic` policies validated by `gga.protocol.validate`, WebDataset tar shards + JSONL manifests, resume-safe shards, parallel episode runner.
+- First harvest produced 13,558 samples in ~1 hour; orchestrator bug (fatal `action_error`) fixed; resumed toward 4M samples in the background.
+- Built `harvest/classify.py` (game/phase/action-family/accepted/novelty/usable labels + sampling weights); first snapshot: 99.6% usable, 30 refused.
+- Published `docs/COLLECTION_STATUS.md` and `docs/class_report_snapshot.json` to the new repo (`4b611fb`).
+- Confirmed the existing `training/streamer_scraping/youtube_streamer_scraper.py` only extracts subtitles/commentary text — no frames or input events — so it is not usable for action trajectories.
+
+**Decided:**
+- **No fine-tuning or model building** until data quality is established (explicit user instruction).
+- Data strategy: classify first, then multi-pass collection (Pass 1 random 4M → Pass 2 heuristic → Pass 3 targeted coverage), then balance/filter.
+- Ten separate models + merge is **deferred**: same-base requirement and 200 ms real-time loop make it unsuitable now.
+- Dataset, weights and venv stay local/gitignored; only code/docs/reports go to GitHub.
+
+**Bugs found:** `gga.game` exits 1 on any refused action (`action_error`) — treated as non-fatal now; venv symlink resolution dropped Playwright; multiprocessing counters cannot be pickled through `ProcessPoolExecutor`; unzip removes Chromium's executable bit (documented earlier).
+
+**Pending:** Pass 1 completion notification; then full-dataset classification and Pass 2. No model work scheduled.
+
 
 
 
