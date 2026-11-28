@@ -1,0 +1,117 @@
+# SESSIONS.md — CupCake Session Log
+
+> Running notes, decisions, bugs, and pending items between coding sessions.
+> AI agents: append a dated entry after every session. Humans: scan for context.
+
+---
+
+## Session Template
+```
+### YYYY-MM-DD — [Session goal]
+**Done:** ...
+**Decided:** ...
+**Bugs found:** ...
+**Pending:** ...
+```
+
+---
+
+## 2026-11-22 — Agent framework + blank.pdf analysis + v0.3 planning
+
+**Done:**
+- Converted CupCake `blank.pdf` (Gemini session, 4 pages, 11/22/2026 02:59) to `blank_full.txt`.
+- Read full conversation: covers GitHub bulk-add CLI, liltii-v0.2 benchmark results, multimode v0.3 planning, Unsloth training script, Qwen3.5-0.8B upgrade path, pxpipe evaluation, real-chat training data guidance.
+- Built complete agent framework: AGENTS.md, PLAN.md, BACKLOG.md, SESSIONS.md, DESIGN.md, SCHEMA.md, SKILL.md.
+- Ingested and sanitized 8 real WhatsApp group chat archives from Downloads (`Sylhet tour`, `Tour de Bangladesh`, `Sundarban`, `Only Discussion`, `Medical vs Engineering`, `CASE Study`, `Zia Hall RUET`, `Chudling Pong`) into `training/raw_chats/`.
+- Downloaded and staged `ALERT.xlsx` and `dataset_cypher.csv` for negative filtering.
+- Generated `training/dataset/liltii_v03_blended_60_40_2500.jsonl` — **2,500 total rows** blended strictly at **60.0% Bangla/Banglish (1,500 rows) : 40.0% English (1,000 rows)** with real banter, poetic quotes, gaming commentary, and technical anchors.
+- Updated `training/train_unsloth_v03.py` and `training/kaggle/liltii_v03_kaggle_notebook.ipynb` to train on the new blended dataset.
+
+**Decided:**
+- **liltii v0.3 = multimode: `sarcastic, moody, flirty, cute`** — single GGUF with `[mode: X]` system tag. No separate repos.
+- **Training: full 16-bit LoRA** (not QLoRA) on 0.5B — model fits in free Colab/Kaggle T4 at 16-bit without 4-bit noise degradation.
+- **Hyperparameters:** r=32, lora_alpha=32, lr=2e-4 (fresh) or 1e-4 (from v0.2), max_seq_length=512, batch=4, grad_accum=4, epochs=3. Stop at 2 epochs if loss < 0.4.
+- **Dataset: 1,000 rows** — 400 game events, 250 app/phone events, 350 companion chat. 90% under 15 words per response.
+- **Key rule:** 30% of events must appear across all 4 modes (contrastive pairs) to prevent personality bleed.
+- **Filler word ban:** No `umm, uh oh, fr, tbh, lol` stacking. Mature = economical sentences.
+- **IFEval fix:** Current 24.32% score is because personality/style lives in runtime system prompts. v0.3 must bake it into training data. Shorter prompts at inference.
+- **Screen reading:** ML Kit OCR on cropped HUD zones first (free, offline). Qwen3.5-0.8B + mmproj as future upgrade to remove OCR layer entirely.
+- **Qwen3.5-0.8B advantages:** IFEval 52.1% (vs v0.2's 24.3%), OCRBench 79.1, ScreenSpot Pro 46.5, 201 languages, ~505 MB Q4_K_M GGUF + projector, ~45 t/s on ARM.
+- **pxpipe verdict:** NOT useful for game assets — it's a text-wall compressor for LLM APIs, not a vision accelerator. Direct `MediaProjection → mmproj` is faster and cleaner.
+- **Training on real chats:** YES, clean and filter first. Remove PII (names, numbers, addresses). Keep natural banter. Format into ChatML with `[mode: X]` tags. Mix: 40% chat, 35% game/app, 25% QA anchor.
+- **Sampling fix for v0.3:** Use Q4_K_M (not Q4_0), `temperature=0.65, min_p=0.08, repeat_penalty=1.08` to kill gibberish and broken subwords like "l3se".
+
+**Bugs found (from blank.pdf chat log analysis):**
+- v0.2 chat log: "bhai am so sleepy thakbo fr so good nope lol tbh" and "l3se train apart" — classic slang-stuffing + context collapse (IFEval 24.3% = fine-tune overwrote base conversational logic).
+- "i'm just a helpful dog" then next turn "oh hello! there's a dog!" — multi-turn context collapse. Root cause: too much casual slang in training data boosting filler-token probabilities.
+- Q4_0 + loose sampling amplifies noise on tiny weights. Fix: Q4_K_M + tighter sampler.
+
+**Pending:**
+- Build liltii-v0.3 dataset (MODEL-01, MODEL-02, MODEL-03 in BACKLOG).
+- Implement ActivityMonitorService for game/app detection (ACTIVITY-01, ACTIVITY-02).
+
+---
+
+## 2026-11-21 — Benchmarks + GitHub setup
+
+**Done:**
+- Ran liltii-v0.2-v3-q4_0.gguf on `hellaswag, arc_challenge, ifeval` via TPN benchmark service.
+- Results: HellaSwag 47.58%, ARC-Challenge 31.40%, IFEval 24.32% (strict mean).
+- Run cost: $6.53 (~30 min, 2 parallel lanes).
+- Model at 928+ downloads on Hugging Face Bengali trending; indexed on Featherless.ai.
+- bangla-smollm-135m-cupcake at 1.03k downloads.
+- Investigated GitHub bulk-add collaborator via `gh` CLI loop.
+- CupCake repo cleaned: removed non-essential files; kept Android app, model training, VM code.
+
+**Decided:**
+- Use `gh api --method PUT /repos/$repo/collaborators/$COLLAB` for bulk invite.
+- Save TPN credits for Validate tab (compare Q4_0 vs F16 safetensors for perplexity/KL) — not for slow HellaSwag runs.
+- Next model iteration: v0.3 multimode, then evaluate Qwen3.5-0.8B upgrade.
+
+**Pending:** v0.3 training dataset construction.
+## 2026-11-22 04:25 - LilTii v0.3 Training Dataset & Kaggle Setup
+- Completed 60:40 blended dataset of 2,500 samples (1,500 Banglish/Bangla + 1,000 English) with 4-mode contrastive pairs, PUBG gaming triggers, YouTube/Instagram app contexts, sanitized WhatsApp tour chats, and romantic poetry quotes.
+- Built standalone self-contained notebook: training/kaggle/liltii_v03_standalone_kaggle.ipynb with base64 embedded dataset and Unsloth 16-bit LoRA + GGUF export.
+## 2026-11-22 05:36 - LilTii v0.3 Training Completed on Kaggle
+- Successfully trained LilTii v0.3 using Qwen3.5-0.8B base with Unsloth 16-bit LoRA on Kaggle T4 GPU.
+- Downloaded and verified outputs: app/src/main/assets/models/liltii-v0.3-q4_k_m.gguf (522 MB) and liltii-v0.3-mmproj.gguf (196 MB).
+## 2026-11-24 01:40 - Hugging Face Model Release: Lilti_kiraa v0.3
+- Successfully uploaded all GGUFs and mmproj projector to: https://huggingface.co/bayazidhs04/Lilti_kiraa-v0.3-Qwen3.5-0.8B
+- Published comprehensive Model Card with real test benchmarks across all 4 personality modes.
+
+---
+
+## 2026-11-24 — In-App HP Pixel Reader, APK Build & Device Testing Success
+**Done:**
+- Added [HpBarReader.kt](file:///home/bayazid/Documents/android/CupCake_VM/app/src/main/java/com/cupcake/game/HpBarReader.kt) and [HpEventGate.kt](file:///home/bayazid/Documents/android/CupCake_VM/app/src/main/java/com/cupcake/game/HpEventGate.kt) inside `com.cupcake.game`.
+- Cleaned intermediate unbundled training weights from `app/src/main/assets/models/v0.3/` into `training/archive_v03_assets/`, preventing Zip32 4 GB packaging errors.
+- Built debug APK `app/build/outputs/apk/debug/app-debug.apk` (1.2 GB bundled).
+- Pushed, installed, and launched `com.cupcake.debug` directly on connected Android device (`151813861E001271`).
+- Verified live runtime: `LlamaEngine` JNI model copied and preloaded, TextToSpeech engine bound, Ollama client initialized without errors.
+- Updated Hugging Face repositories ([`bayazidhs04/Lilti_gemma4_E2B_pruned_v0.1`](https://huggingface.co/bayazidhs04/Lilti_gemma4_E2B_pruned_v0.1) and [`bayazidhs04/Lilti_kiraa-v0.3-Qwen3.5-0.8B`](https://huggingface.co/bayazidhs04/Lilti_kiraa-v0.3-Qwen3.5-0.8B)) with full multimodal tags: `audio`, `image`, `multimodal`, `vision`, `audio-text-to-text`, `image-text-to-text`, `speech`.
+
+---
+
+## 2026-11-28 — Kaggle "Generalist Gaming Agent" feasibility report (research only)
+
+**Done:**
+- Read Kaggle competition Overview/Data/Rules/Code tabs (GARC, started Nov 23 2026, ~3 months left, $50k prizes).
+- Audited local assets against the task: 32 real-time browser games, 4 public + 28 hidden, 200 ms decision points, 11 mouse/keyboard tools, offline notebook with llama.cpp explicitly allowed.
+- Wrote comprehensive report at `docs/GGA_COMPETITION_REPORT.md`: competition facts, observation/action contracts, timing, scoring, submission mechanics, asset audit, needed vs not-needed gap analysis, hybrid architecture, 6-phase work breakdown, risks, decision gate.
+- Added GGA-00..GGA-06 track to `BACKLOG.md`.
+- **No implementation started** — report first per user instruction.
+
+**Decided:**
+- Custom GGUFs are *allowed* (weights attachable, llama.cpp server supported, RTX Pro 6000 96 GB) but *not ready*: v0.2 is text-only, v0.3 is multimodal but trained for chat and emits the wrong output contract.
+- Strategy: port the `PUBG_Ally` hybrid — deterministic reflex policy owns the 200 ms loop; multimodal v0.3 + mmproj is a slow planner emitting `sequence` programs; `skip` yields while it thinks.
+- Replace `EmotionGrammar.TAG_ACTION` with a tool-call GBNF/JSON-schema grammar. Only the 4 sample games are legal training data.
+- Do notebook skeleton + reflex baseline (GGA-00..02) before any fine-tuning; benchmark the decision-model starter too.
+- Deterministic sampling/seeds for all measurements (run-to-run drift 0.001–0.01 otherwise); note the ~6 h leaderboard feedback loop.
+
+**Bugs found:** None (no code changed). Doc drift noted: `AGENTS.md` calls v0.3 "next" and Qwen3.5-0.8B "future" although `SESSIONS.md`/HF confirm v0.3 is already Qwen3.5-0.8B + mmproj.
+
+**Pending:** GGA-00 (join/accept rules, attach weights, verify local headless run) when the user gives the go-ahead.
+
+
+
+
