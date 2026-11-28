@@ -1,0 +1,8 @@
+# Local test outputs and generated junk
+runs/
+trajectories/
+*.gguf
+*.log
+__pycache__/
+*.pyc
+.ipynb_checkpoints/

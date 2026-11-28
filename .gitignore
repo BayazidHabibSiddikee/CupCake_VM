@@ -57,6 +57,13 @@ esp/build/
 cmake-build-*/
 CMakeFiles/
 
+# Python generated junk
+__pycache__/
+*.pyc
+
+# Competition workspace outputs
+competition/gga/runs/
+
 # Coverage
 *.ec
 coverage/

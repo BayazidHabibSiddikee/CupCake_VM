@@ -32,8 +32,9 @@
 
 ---
 
-## 🟢 GGA COMPETITION (Kaggle — planned, no code yet)
+## 🟢 GGA COMPETITION — ACTIVE MISSION (Kaggle)
 
+> **Workspace:** `competition/gga/` (charter, protocol notes, agent scaffold, submission notebook).
 > Full analysis in `docs/GGA_COMPETITION_REPORT.md`. Do phases in order; measure the reflex baseline before spending GPU time on a fine-tune.
 
 - [ ] **[GGA-00]** Join "Generalist Gaming Agent" on Kaggle, accept rules (entry deadline Feb 22 2027), attach dataset + `liltii-v0.3-q4_k_m.gguf` + `liltii-v0.3-mmproj.gguf`, verify headless local run of `off_line` with a stub agent.

@@ -132,6 +132,28 @@
 
 **Pending:** GGA-00 when user gives go-ahead; the A/B challenger test after GGA-02; HF card metric correction.
 
+---
+
+## 2026-11-28 (3) — Safe cleanup + competition mission workspace
+
+**Done:**
+- Confirmed scope with user first: safe cleanup only, competition work in a new folder in this repo, chat data preserved.
+- Deleted only untracked/ignored generated junk: `blank.pdf`, `blank_full.txt`, three root `liltii-banglish-emotion-llm*.log` files, and five `__pycache__` directories (root, streamer_scraping, gemma4_pruning, PUBG_Ally, live_commentator).
+- **Kept intact:** all app code, training pipeline/datasets/outputs, models, `PUBG_Ally/chat_history.json`, `training/raw_chats/`, archived logs, submodule files. Modified tracked files (`gradle.properties`, `training/kaggle/kernel-metadata.json`) untouched.
+- Created `competition/gga/`: `README.md` (mission charter + rules of engagement + phase checklist), `PROTOCOL_NOTES.md` (observation/action/timing/scoring/submission facts), `agent.py` (safe `skip`-only scaffold for GGA-01, TODOs for GGA-02..05), `submission_template.ipynb` (attach inputs → start llama-server → write agent.py → start GGAInferenceServer), `.gitignore`, `runs/` via ignore rule.
+- Root `.gitignore` now ignores `__pycache__/`, `*.pyc`, `competition/gga/runs/`.
+- `BACKLOG.md` GGA section renamed to **ACTIVE MISSION** with workspace pointer.
+
+**Decided:**
+- Competition mission lives in `competition/gga/`; no changes to Android/ESP32/submodule for this mission.
+- All competition commits use a `gga:` prefix and are pushed to `origin/main` every session.
+- No model weights in git — attach to Kaggle. No fine-tuning before GGA-02 baseline.
+- The scaffold is a no-op on purpose: it validates submission mechanics, not score.
+
+**Bugs found:** None (no executed model code yet). Note: `agent.py` uses `remaining_s` as a placeholder game-boundary signal until `obs.elapsed_s` is confirmed in the real `gga.protocol.py`.
+
+**Pending:** GGA-00 (join/accept rules, attach dataset + v0.3 GGUFs, 1-min headless smoke test) when user gives go-ahead.
+
 
 
 
